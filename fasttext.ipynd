@@ -1,0 +1,35 @@
+from google.colab import drive
+drive.mount('/content/drive')
+
+import pandas as pd
+
+clauseTypes = ["Governing Law", "Document Name", "Parties", "Agreement Date", "Expiration Date", "Anti-Assignment", "No-Solicit Of Employees", "Cap On Liability", "License Grant", "Insurance"]
+
+for x in clauseTypes:
+  #set up field names to be extracted from csv
+  fields = [x, x+"-Answer"]
+
+  #testing
+  #print(fields)
+
+  #extract fields currently in fields variable and check for empty
+  df = pd.read_csv('/content/drive/MyDrive/Team16capstone/CUAD_v1/CUAD_v1/master_clauses.csv', usecols = fields)
+
+  #print(df[[x]])
+
+  tmp = df.values.tolist()
+
+  #print(tmp)
+
+  df2 = pd.DataFrame(columns = ["Type", "Clause"])
+
+  for y in tmp:
+    #print(y)
+    if(y[0] != "[]"):
+      #print(y[1])
+      tmpdf = pd.DataFrame([[x, y[0]]], columns = ["Type", "Clause"])
+      #print(tmpdf)
+      df2 = df2.append(tmpdf, ignore_index=True)
+  #print(df2)
+  df2.to_csv('/content/drive/MyDrive/Team16capstone/clauses_fasttext.csv')
+
