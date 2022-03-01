@@ -1,91 +1,41 @@
-from flair.data import Sentence
-from flair.embeddings import WordEmbeddings, FlairEmbeddings
-from flair.embeddings import StackedEmbeddings
-import pandas as pd
-from difflib import SequenceMatcher
+# Import Necessary Libraries
+import os
+import re
+
 import json
-from pathlib import Path
+import pandas as pd
+import numpy as np
+from sklearn import metrics
+
+# Global Variables
+attributeDictionary = {
+    "Document Name": "DN",
+    "Parties": "P",
+    "Agreement Date": "AD",
+    "Expiration Date": "ED",
+    "Governing Law": "GL",
+    "No-Solicit Of Employees": "NS",
+    "Anti-Assignment": "AA",
+    "License Grant": "LG",
+    "Cap On Liability": "CL",
+    "Insurance": "IN"
+}
 
 
-def matcher(string, pattern):
-    """
-    Return the start and end index of any pattern present in the text.
-    """
-    match_list = []
-    # pattern = pattern.strip()
-    seqMatch = SequenceMatcher(None, string, pattern, autojunk=False)
-    match = seqMatch.find_longest_match(0, len(string), 0, len(pattern))
-    if match.size == len(pattern):
-        start = match.a
-        end = match.a + match.size
-        match_tup = (start, end)
-        string = string.replace(pattern, "X" * len(pattern), 1)
-        match_list.append(match_tup)
+# FUNCTIONS
 
-    return match_list, string
-
-
-def mark_sentence(s, match_list):
-    """
-    Marks all the entities in the sentence as per the BIO scheme.
-    """
-    # dict containing all B-I
-    word_dict = {}
-    for word in s.split():
-        word_dict[word] = 'O'
-
-    for start, end, e_type in match_list:
-        temp_str = s[start:end]
-        tmp_list = temp_str.split()
-        if len(tmp_list) > 1:
-            word_dict[tmp_list[0]] = 'B-' + e_type
-            for w in tmp_list[1:]:
-                word_dict[w] = 'I-' + e_type
-        else:
-            word_dict[temp_str] = 'B-' + e_type
-    return word_dict
-
-
-def clean(text):
-    """
-    Just a helper function to add a space before the punctuations for better tokenization
-    """
-    filters = ["!", "#", "$", "%", "&", "(", ")", "/", "*", ":", ";", "<", "=", ">", "?", "@", "[",
-               "\\", "]", "_", "`", "{", "}", "~", "'"]
-    for i in text:
-        if i in filters:
-            text = text.replace(i, i + " ")
-
-    return text
-
-
-def create_data(df, filepath):
-    """
-    The function responsible for the creation of data in the said format.
-    """
-    with open(filepath, 'w', encoding="utf-8") as f:
-        for text, annotation in zip(df.text, df.annotation):
-            # text = clean(text)
-            text_ = text
-            match_list = []
-
-            for i in annotation:
-                a, text_ = matcher(text, i[0])
-                match_list.append((a[0][0], a[0][1], i[1]))
-
-            d = mark_sentence(text, match_list)
-
-            for i in d.keys():
-                f.writelines(i + ' ' + d[i] + '\n')
-            f.writelines('\n')
-
-
+# Function to load json file and return json fle in dictionary format
+# Parameters: file path to json in string format
+# Return: dictionary of JSON
 def load_json(path):
     with open(path, "r") as f:
         dict = json.load(f)
     return dict
 
 
+# Function to get answer data from json dictionary
+# Parameters: json in dictionary form
+# Return: Returns
 def get_answers(test_json_dict):
     results = {}
     ner_list = ["Document Name", "Parties", "Agreement Date", "Expiration Date", "Governing Law",
@@ -111,6 +61,9 @@ def get_answers(test_json_dict):
     return results
 
 
+# Function to get all the titles as a list
+# Parameters: json in dictionary form
+# Return: titles as a list
 def get_titles(test_json_dict):
     data = test_json_dict["data"]
     titles = []
@@ -120,62 +73,9 @@ def get_titles(test_json_dict):
     return titles
 
 
-def append_titles(titles):
-    ner_list = ["Document Name", "Parties", "Agreement Date", "Expiration Date", "Governing Law",
-                "No-Solicit Of Employees", "Anti-Assignment", "License Grant", "Cap On Liability", "Insurance"]
-    appended_titles = []
-    for title in titles:
-        for ner in ner_list:
-            title_appended = title + "__" + ner
-            appended_titles.append(title_appended)
-
-    return appended_titles
-
-
-attributeDictionary = {
-    "Document Name": "DN",
-    "Parties": "P",
-    "Agreement Date": "AD",
-    "Expiration Date": "ED",
-    "Governing Law": "GL",
-    "No-Solicit of Employees": "NS",
-    "Anti-Assignment": "AA",
-    "License Grant": "LG",
-    "Cap on Liability": "CL",
-    "Insurance": "IN"
-}
-
-
-def get_cur_attr_by_title(title):
-    attr_list = title.split("_")
-    if attr_list[-1] == "Document Name":
-        attr_list[-1] = "DN"
-    elif attr_list[-1] == "Parties":
-        attr_list[-1] = "P"
-    elif attr_list[-1] == "Agreement Date":
-        attr_list[-1] = "AD"
-    elif attr_list[-1] == "Expiration Date":
-        attr_list[-1] = "ED"
-    elif attr_list[-1] == "Governing Law":
-        attr_list[-1] = "GL"
-    elif attr_list[-1] == "No-Solicit Of Employees":
-        attr_list[-1] = "NS"
-    elif attr_list[-1] == "Anti-Assignment":
-        attr_list[-1] = "AA"
-    elif attr_list[-1] == "License Grant":
-        attr_list[-1] = "LG"
-    elif attr_list[-1] == "Cap on Liability":
-        attr_list[-1] = "CL"
-    elif attr_list[-1] == "Insurance":
-        attr_list[-1] = "IN"
-    return attr_list[-1]
-
-
-def answer_attribute_pair(ans, attr):
-    pair = (ans, attr)
-    return pair
-
-
+# Function to get all contexts
+# Parameters:  json in dictionary form
+# Return: dictionary with key value as title of contract and value being the context
 def get_contexts(test_json_dict):
     results = {}
     data = test_json_dict['data']
@@ -186,145 +86,148 @@ def get_contexts(test_json_dict):
     return results
 
 
-def get_only_title(title):
-    newTitle = title.split('_')
+# Function to a list of sentances
+# Parameters: context as string
+# Return: list of sentences split by blank space
+def get_sentences(context):
+    lines = context.splitlines()
+    lines = [x for x in lines if x]
+    sentence_word_split = []
+    for sentence in lines:
+        sentence_word_split.append(sentence.split())
+    return sentence_word_split
+
+
+# Function to get all of the ids and answers associated with a certain document
+# Parameters: the answers dictionary resulting from get_answers(), title of document you want information for
+# Return: dictionary of answers and ids associated with a certain document, key is id, value is answers
+def get_title_answers(answers, title):
+    title_ans = []
+    for key in answers.keys():
+        if title in key:
+            title_ans.append(key)
+    temp_dict = {}
+    for id in title_ans:
+        temp_dict[id] = answers[id]
+    return temp_dict
+
+
+# Function to get all the words in a document with detailed context information Parameters: context as string Return:
+# list of all words in a document with start index, end index, and a filler BIO-ANNOTATED label 'O' to be updated later
+def split_context_w_indexes(context_text):
+    words = []
+    my_context = context_text + ' '
     index = 0
-    title_no_attr = ""
-    while index < (len(newTitle) - 2):
-        title_no_attr += newTitle[index]
-        index += 1
-    return title_no_attr
+    word = ''
+    starting_index = 0
+    ending_index = 0
+    while len(my_context) > index:
+        if index == 0:
+            word = word + my_context[index]
+            starting_index = 0
+            index = index + 1
+        else:
+            cur_char = my_context[index]
+            if len(word) == 0:
+                if cur_char == ' ' or cur_char == '\n':
+                    index = index + 1
+                elif cur_char != ' ':
+                    word = word + cur_char
+                    starting_index = index
+                    index = index + 1
+            else:
+                if cur_char == ' ' or cur_char == '\n':
+                    ending_index = index
+                    words.append([word, starting_index, ending_index, 'O'])
+                    word = ''
+                    index = index + 1
+                elif cur_char != ' ':
+                    word = word + cur_char
+                    index = index + 1
+    return words
+
+
+# Function to get all answers assocaited with a title
+# Parameters: result from get_title_answers()
+# Return: list of answers in format [answer text, start index, end index, BIO-ANNOTATED TAG]
+def get_title_ans_list_bio_anno(title_ans, answers):
+    full_ans_list = []
+    for title_id in title_ans:
+        id_split = title_id.split('__')
+        id_answers = answers[title_id]
+        for ans in id_answers:
+            full_ans_list.append([ans[0], ans[1], ans[1] + len(ans[0]), attributeDictionary[id_split[1]]])
+    return full_ans_list
+
+
+def mark_sentence(entity_list, text_list):
+    word_list = []
+    for word, start_, end_, t in text_list:
+        match = False
+        for text, start, end, tag in entity_list:
+            if start_ == start:
+                temp = (word, start_, end_, 'B-' + tag)
+                word_list.append(temp)
+                match = True
+            elif (start_ > start) & (start_ <= end):
+                temp = (word, start_, end_, 'I-' + tag)
+                word_list.append(temp)
+                match = True
+                if end_ == end:
+                    try:
+                        entity_list.remove((text, start, end, tag))
+                        print("rm")
+                    except ValueError:
+                        print("")
+                break
+        # print(word_list)
+        if not match:
+            temp = (word, start_, end_, '0')
+            word_list.append(temp)
+
+    return word_list
 
 
 def main():
-
-    # --------------------------------------------------------------------------------------- #
-    # key:
-    # a TITLE is the name of a specific attribute within a contract
-    # an example of a title is 'LIMEENERGYCO_09_09_1999-EX-10-DISTRIBUTOR AGREEMENT__Parties'
-    # this title represents all the 'Parties' attributes that can be taken from CUAD_v1.json
-    # a CONTRACT is the combination of 10 titles with every attribute included
-    # contracts will mostly be plain text and used as context for NER recognition
-    # --------------------------------------------------------------------------------------- #
-
-    # path to save the txt file.
-    filepath = 'train/'
-    # read text for LIME ENERGY distribution contract from json
     cuad_json = load_json("json/CUAD_v1.json")
-    # get all titles in a list, around 500 titles in this
     titles = get_titles(cuad_json)
-    # append the attribute of the title to the end of the title
-    # now of form 'contractName__attribute'
-    titles_appended = append_titles(titles)
-    # get full context of contract (contract as a str)
-    context = get_contexts(cuad_json)
-    # get all answers associated with different titles
-    # key is title of contract
     answers = get_answers(cuad_json)
+    contexts = get_contexts(cuad_json)
 
-    # -------------------
-    # testing
-    # -------------------
-    # print working title
-    # print(titles_appended[1])
-    # print working title answers (does not include text associated w)
-    # print(answers[titles_appended[1]])
-    # print only the text from the first element of answers[titles_appended[1]]
-    # print("first of title[1]: " + answers[titles_appended[1]][1][0])
-    # print first 10 titles of the first contract
-    # print(titles_appended[0:10])
-    # -------------------
+    # for ans in answers:
+        # print(titles)
 
-    # create list of k,v pairs that will be input into the second half of the dataframe
-    ans_attr_associated = []
-    # change which title the for loop goes over, index one should output:
-    # [('Distributor', 'Parties'), ('Electric City Corp.', 'Parties'), ('Electric City of Illinois L.L.C.', 'Parties'),
-    # ('Company', 'Parties'), ('Electric City of Illinois LLC', 'Parties')]
+    # LIMEENERGYCO_09_09_1999-EX-10-DISTRIBUTOR AGREEMENT
+    # [['DISTRIBUTOR AGREEMENT', 44]]
     title_index = 0
-    context_index = 0
-    index = 0
+    for title in titles:
+        my_context = contexts[title]
+        # print(my_context[0:105])
+        print(title)
+        ex = split_context_w_indexes(my_context)
+        # print(ex)
+        title_ans = get_title_answers(answers, title)
 
-    # get titles into new dict that associates answer with attribute pairing
-    # loop through all titles (10 per contract with all attributes)
-    for a in titles_appended:
-        answer_index = 0
-        # get current title
-        cur_title = titles_appended[title_index]
-        # print(cur_title)
-        # loop through all answers in a given title:
-        # example file="LIMEENERGYCO_09_09_1999-EX-10-DISTRIBUTOR AGREEMENT__Parties"
-        # returns five answers with the attribute of 'Parties'
+        # print(title_ans)
 
-        # next file
-        if title_index % 10 == 0:
-            # ans_attr_associated = []
-            answer_index = 0
-            # get new file name (next contract with 10 attrs)
-            # get just name from title
-            newTitle = get_only_title(cur_title)
-            path = 'train/' + newTitle + '_train.txt'
-            filepath = path
-            # check if file already exists
-            if Path('train/' + newTitle + '_train.txt').is_file():
-                # clear old and overwrite if it does exist
-                # print("File exist")
-                file = open(path, "r+")
-                file.truncate()
-            else:
-                # make new file if it doesnt exist
-                # print("File not exist")
-                f = open(path, "w+")
+        full_list = get_title_ans_list_bio_anno(title_ans, answers)
+        # for l in full_list:
+            # print(l)
 
-        for ans in answers[titles_appended[title_index]]:
+        word_list = mark_sentence(full_list, ex)
+        # for word in word_list:
+            # print(word)
 
-            # if its the 10th title, it has gone through titles [0:9]
-            # because theres only 10 attrs, we know the next file will start next itr
-            if title_index % 10 == 0 and title_index != 0:
-                break
-
-            # - appends a k,v pair to the list ans_attr_associated
-            # - answers[titles_appended[title_index]][answer_index][0] is the text of all answers inside a specific attr
-            # - get_cur_attr_by_title(cur_title) gets the attr by splitting the current title and taking the last
-            # element (the attribute)
-            ans_attr_associated.append(answer_attribute_pair(answers[titles_appended[title_index]][answer_index][0],
-                                                             get_cur_attr_by_title(cur_title)))
-            answer_index += 1
-
-        # create dataframe for the ten titles that have been gone through
-        if title_index % 10 == 0 and title_index != 0:
-            print(ans_attr_associated)
-            print(len(ans_attr_associated))
-            # the main data frame
-            # includes the entire context for a contract and lists of every attribute answer given in CUAD_v1.json
-            # made of the form text, annotation
-            if title_index % 10 == 0 and title_index != 0:
-                # print(ans_attr_associated)
-                # print(len(ans_attr_associated))
-                # the main data frame
-                # includes the entire context for a contract and lists of every attribute answer given in CUAD_v1.json
-                # made of the form text, annotation
-                data = pd.DataFrame([[context[titles[context_index]],
-                                      [ans_attr_associated[0]]],
-                                     ],
-                                    columns=['text', 'annotation'])
-
-                context_frame = []
-                answers_frame = ans_attr_associated
-                data_dict = {'text': context[titles[context_index]], 'annotation': [ans_attr_associated]}
-
-                data = pd.DataFrame(data_dict)
-                print(data)
-
-                # title_index += 1
-                ans_attr_associated = []
-                context_index += 1
-                # creating the file.
-                create_data(data, filepath)
-
-        title_index += 1
-
-    # print new answers with associated attribute pairings
-    # print(ans_attr_associated)
+        # output something
+        f = open("train/" + title + "_train.txt", "w", encoding="utf-8")
+        itr = 0
+        # get indexes where theres a period in order to create a newline for each  sentence
+        for word in word_list:
+            f.write(word_list[itr][0] + " " + word_list[itr][3] + "\n")
+            if "." in word_list[itr][0]:
+                if '.' == word_list[itr][0][-1]:
+                    f.write("\n")
+            itr += 1
 
 
 if __name__ == '__main__':
