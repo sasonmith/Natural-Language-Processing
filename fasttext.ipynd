@@ -3,9 +3,6 @@ drive.mount('/content/drive')
 
 import pandas as pd
 
-#Note, the sections commented out labelled testing
-#These are points where you can print certain pieces of data to debug your own execution
-
 #Change the file path to your config file
 #The config file should have one line as the fields you want to examine in the master clauses csv file
 #These should be in a csv format on the first line
@@ -25,46 +22,26 @@ with open("/content/drive/MyDrive/Team16capstone/fasttext_processor_config.txt",
   inputClausesCSV = lines[1]
   outputFasttextClauses = lines[2]
 
-  #testing
-  #print(clauseTypes)
-  #print(inputClausesCSV)
-
+  headerSetup = pd.DataFrame(columns = ["Type", "Clause"])
+  headerSetup.to_csv(outputFasttextClauses, mode='a', index=False)
 
 for x in clauseTypes:
   #set up field names to be extracted from csv
   fields = [x, x+"-Answer"]
 
-  #testing
-  #print(fields)
-
   #extract fields currently in fields variable and check for empty
   df = pd.read_csv(inputClausesCSV, usecols = fields)
 
-  #testing
-  #print(df[[x]])
-
   #change into list to easily modify
   tmp = df.values.tolist()
-
-  #testing
-  #print(tmp)
 
   #create new empty dataframe to hold the fields we want
   df2 = pd.DataFrame(columns = ["Type", "Clause"])
 
   for y in tmp:
-    #testing
-    #print(y)
     if(y[0] != "[]"):
-      #testing
-      #print(y[1])
-      tmpdf = pd.DataFrame([[x, y[0]]], columns = ["Type", "Clause"])
-      #testing
-      #print(tmpdf)
-      df2 = df2.append(tmpdf, ignore_index=True)
+      tmp2 = y[0].strip('[]')
+      tmpdf = pd.DataFrame([[x, tmp2]], columns = ["Type", "Clause"])
+      #append output file
+      tmpdf.to_csv(outputFasttextClauses, mode='a', header=False, index=False)
 
-  #testing
-  #print(df2)
-
-  #write the dataframe with the "type, clause"(fasttext) format to a csv
-  df2.to_csv('outputFasttextClauses')
