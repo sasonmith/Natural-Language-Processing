@@ -1,0 +1,23 @@
+import pandas as pd
+import numpy as np
+
+# read text file into pandas DataFrame
+df = pd.read_csv("train/train.txt", sep=" ", header=None)
+
+# display DataFrame
+print(df)
+
+train, dev, test = \
+              np.split(df.sample(frac=1, random_state=42),
+                       [int(.6*len(df)), int(.8*len(df))])
+
+print("train\n")
+print(train)
+print("test\n")
+print(test)
+print("dev\n")
+print(dev)
+
+train.to_csv("train_test_dev/train.txt", sep=" ", index=False, header=False)
+test.to_csv("train_test_dev/test.txt", sep=" ", index=False, header=False)
+dev.to_csv("train_test_dev/dev.txt", sep=" ", index=False, header=False)
