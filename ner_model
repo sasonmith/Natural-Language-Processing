@@ -1,0 +1,65 @@
+from typing import List
+import flair
+import torch
+from flair.data import Corpus
+from flair.data import Sentence
+from flair.datasets import ColumnCorpus
+from flair.embeddings import WordEmbeddings, StackedEmbeddings, TokenEmbeddings
+from flair.models import SequenceTagger
+from flair.trainers import ModelTrainer
+
+device = None
+if torch.cuda.is_available():
+    device = torch.device('cuda:0')
+else:
+    device = torch.device('cpu')
+
+# define columns
+columns = {0: 'text', 1: 'ner'}
+
+# this is the folder in which train, test and dev files reside
+data_folder = './train'
+
+# init a corpus using column format, data folder and the names of the train, dev and test files
+corpus: Corpus = ColumnCorpus(data_folder, columns,
+                              train_file='train.txt',
+                              test_file='test.txt',
+                              dev_file='dev.txt')
+
+# print(len(corpus.train))
+print(corpus.train[0].to_tagged_string('ner'))
+tag_type = 'ner'
+tag_dict = corpus.make_label_dictionary(label_type=tag_type)
+
+embedding_types: List[TokenEmbeddings] = [
+    WordEmbeddings('glove'),
+    # other embeddings
+]
+embeddings: StackedEmbeddings = StackedEmbeddings(
+    embeddings=embedding_types)
+
+tagger: SequenceTagger = SequenceTagger(hidden_size=256,
+                                        embeddings=embeddings,
+                                        tag_dictionary=tag_dict,
+                                        tag_type=tag_type,
+                                        use_crf=True)
+print(tagger)
+
+trainer: ModelTrainer = ModelTrainer(tagger, corpus)
+trainer.train('resources/taggers/example-ner',
+              learning_rate=0.1,
+              mini_batch_size=32,
+              max_epochs=1)
+
+# load the trained model
+model = SequenceTagger.load('resources/tagger/example-ner/final-model.pt')
+# create example sentence
+sentence = Sentence('1 EXHIBIT 10.26 Confidential Treatment Requested CO-BRANDING AGREEMENT This Co-Branding '
+                    'Agreement (this "Agreement") by and between VerticalNet, VerticalNet, Inc., a Pennsylvania '
+                    'corporation having a principal place of business at 700 Dresher Road, Suite 100, Horsham, '
+                    'Pennsylvania, PA 19044 ("VerticalNet"), and Neoforma.com, Neoforma.com, Inc., a Delaware '
+                    'corporation having a principal place of business at 3255-7 Scott Boulevard, Santa Clara, '
+                    'CA 95054 ("Neoforma"), is dated as Of November 19, 1999 (the "Effective Date").')
+# predict the tags
+model.predict(sentence)
+print(sentence.to_tagged_string())

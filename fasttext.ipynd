@@ -3,33 +3,45 @@ drive.mount('/content/drive')
 
 import pandas as pd
 
-clauseTypes = ["Governing Law", "Document Name", "Parties", "Agreement Date", "Expiration Date", "Anti-Assignment", "No-Solicit Of Employees", "Cap On Liability", "License Grant", "Insurance"]
+#Change the file path to your config file
+#The config file should have one line as the fields you want to examine in the master clauses csv file
+#These should be in a csv format on the first line
+#The second line should be the file path to the master clauses csv file
+#The third line should be the file path to the output, it should create the output if one doesnt already exist
+with open("/content/drive/MyDrive/Team16capstone/fasttext_processor_config.txt","r") as fastTextConfig:
+  lines = fastTextConfig.readlines()
+
+  #If issues arise with the final data field, see below
+  #This line removes the '\n' endline character, change to your system specific endline character
+  lines[0] = lines[0].rstrip('\n')
+  lines[1] = lines[1].rstrip('\n')
+  lines[2] = lines[2].rstrip('\n')
+
+  #Splits the data types line by comma and fills the clauseTypes list, also puts the file path to the master clauses csv file
+  clauseTypes = lines[0].split(',')
+  inputClausesCSV = lines[1]
+  outputFasttextClauses = lines[2]
+
+  headerSetup = pd.DataFrame(columns = ["Type", "Clause"])
+  headerSetup.to_csv(outputFasttextClauses, mode='a', index=False)
 
 for x in clauseTypes:
   #set up field names to be extracted from csv
   fields = [x, x+"-Answer"]
 
-  #testing
-  #print(fields)
-
   #extract fields currently in fields variable and check for empty
-  df = pd.read_csv('/content/drive/MyDrive/Team16capstone/CUAD_v1/CUAD_v1/master_clauses.csv', usecols = fields)
+  df = pd.read_csv(inputClausesCSV, usecols = fields)
 
-  #print(df[[x]])
-
+  #change into list to easily modify
   tmp = df.values.tolist()
 
-  #print(tmp)
-
+  #create new empty dataframe to hold the fields we want
   df2 = pd.DataFrame(columns = ["Type", "Clause"])
 
   for y in tmp:
-    #print(y)
     if(y[0] != "[]"):
-      #print(y[1])
-      tmpdf = pd.DataFrame([[x, y[0]]], columns = ["Type", "Clause"])
-      #print(tmpdf)
-      df2 = df2.append(tmpdf, ignore_index=True)
-  #print(df2)
-  df2.to_csv('/content/drive/MyDrive/Team16capstone/clauses_fasttext.csv')
+      tmp2 = y[0].strip('[]')
+      tmpdf = pd.DataFrame([[x, tmp2]], columns = ["Type", "Clause"])
+      #append output file
+      tmpdf.to_csv(outputFasttextClauses, mode='a', header=False, index=False)
 
